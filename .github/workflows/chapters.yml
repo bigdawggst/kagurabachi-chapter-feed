@@ -1,0 +1,45 @@
+name: Update Kagurabachi chapter RSS
+
+on:
+  schedule:
+    # Routine checks every four hours, plus checks around normal Sunday release time.
+    # GitHub Actions cron schedules are best effort and may run late.
+    - cron: '7 0,4,8,12,16,20 * * *'
+    - cron: '2,12,22,32,42,52 15,16 * * 0'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: kagurabachi-chapter-rss
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Test chapter detection
+        run: python -m unittest discover -s tests -v
+      - name: Check official VIZ chapter list
+        run: python update_chapters.py
+      - name: Commit and publish updated feed
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add chapters.xml state.json
+          if git diff --cached --quiet; then
+            echo 'No updates to publish'
+            exit 0
+          fi
+          git commit -m 'Update official Kagurabachi chapter feed'
+          git push
